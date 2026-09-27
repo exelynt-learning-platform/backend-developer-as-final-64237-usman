@@ -1,4 +1,4 @@
-# Resource Booking System API
+# Resource Booking System API - Assignment 2026
 
 A robust, enterprise-grade RESTful API for managing bookable resources and reservations. Built strictly following the 12-Factor App methodology using Spring Boot, Java 17, Spring Security (JWT), and PostgreSQL.
 
