@@ -1,0 +1,14 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Base64-encoded HMAC-SHA256 secret key (minimum 256 bits) used to sign JWTs."
+    },
+    {
+      "name": "jwt.expiration-ms",
+      "type": "java.lang.Long",
+      "description": "JWT validity period in milliseconds."
+    }
+  ]
+}
