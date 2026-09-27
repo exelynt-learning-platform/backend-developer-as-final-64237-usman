@@ -4,6 +4,7 @@ import com.usman.resourcebooking.dto.request.ReservationCreateRequest;
 import com.usman.resourcebooking.dto.response.ReservationResponse;
 import com.usman.resourcebooking.exception.BadRequestException;
 import com.usman.resourcebooking.exception.ConflictException;
+import com.usman.resourcebooking.exception.ForbiddenException;
 import com.usman.resourcebooking.exception.ResourceNotFoundException;
 import com.usman.resourcebooking.model.Reservation;
 import com.usman.resourcebooking.model.ReservationStatus;
@@ -28,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
 
+        private static final java.util.List<ReservationStatus> ACTIVE_STATUSES = java.util.List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+
         private final ReservationRepository reservationRepository;
         private final ResourceRepository resourceRepository;
         private final UserRepository userRepository;
@@ -41,7 +44,7 @@ public class ReservationServiceImpl implements ReservationService {
                 User user = userRepository.findById(principal.getId())
                                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", principal.getId()));
 
-                Resource resource = resourceRepository.findById(request.getResourceId())
+                Resource resource = resourceRepository.findByIdWithPessimisticWriteLock(request.getResourceId())
                                 .orElseThrow(() -> new ResourceNotFoundException("Resource", "id",
                                                 request.getResourceId()));
 
@@ -56,7 +59,7 @@ public class ReservationServiceImpl implements ReservationService {
 
                 boolean isOverlapping = reservationRepository.existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
                         request.getResourceId(),
-                        java.util.List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED),
+                        ACTIVE_STATUSES,
                         request.getEndTime(),
                         request.getStartTime()
                 );
@@ -119,7 +122,7 @@ public class ReservationServiceImpl implements ReservationService {
                 checkOwnership(reservation, authentication);
 
                 if (!reservation.getResource().getId().equals(request.getResourceId())) {
-                        Resource resource = resourceRepository.findById(request.getResourceId())
+                        Resource resource = resourceRepository.findByIdWithPessimisticWriteLock(request.getResourceId())
                                         .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", request.getResourceId()));
                         if (!resource.isAvailable()) {
                                 throw new ConflictException("Resource '" + resource.getName() + "' is not currently available for booking");
@@ -134,7 +137,7 @@ public class ReservationServiceImpl implements ReservationService {
                 boolean isOverlapping = reservationRepository.existsByResourceIdAndIdNotAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
                         request.getResourceId(),
                         id,
-                        java.util.List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED),
+                        ACTIVE_STATUSES,
                         request.getEndTime(),
                         request.getStartTime()
                 );
@@ -147,11 +150,14 @@ public class ReservationServiceImpl implements ReservationService {
                 reservation.setEndTime(request.getEndTime());
                 reservation.setPrice(request.getPrice());
                 
-                if (status != null) {
+                if (status != null && status != reservation.getStatus()) {
                         boolean isAdmin = authentication.getAuthorities().stream()
                                         .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-                        if (!isAdmin && status == ReservationStatus.CONFIRMED) {
-                                throw new com.usman.resourcebooking.exception.ForbiddenException("Only administrators can confirm reservations.");
+                        
+                        if (!isAdmin) {
+                                if (reservation.getStatus() != ReservationStatus.PENDING || status != ReservationStatus.CANCELLED) {
+                                        throw new ForbiddenException("Users can only cancel pending reservations. Other status transitions require admin privileges.");
+                                }
                         }
                         reservation.setStatus(status);
                 }
@@ -176,7 +182,7 @@ public class ReservationServiceImpl implements ReservationService {
                                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
                 if (!isAdmin && !reservation.getUser().getId().equals(principal.getId())) {
-                        throw new com.usman.resourcebooking.exception.ForbiddenException("You do not have permission to access this reservation");
+                        throw new ForbiddenException("You do not have permission to access this reservation");
                 }
         }
 

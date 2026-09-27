@@ -100,7 +100,7 @@ class ReservationServiceImplTest {
         req.setPrice(BigDecimal.valueOf(100));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(resourceRepository.findById(100L)).thenReturn(Optional.of(resource));
+        when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
         when(reservationRepository.save(any(Reservation.class))).thenAnswer(invocation -> {
             Reservation r = invocation.getArgument(0);
             r.setId(10L);
@@ -121,7 +121,7 @@ class ReservationServiceImplTest {
         req.setResourceId(100L);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(resourceRepository.findById(100L)).thenReturn(Optional.of(resource));
+        when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
 
         assertThrows(ConflictException.class, () -> reservationService.createReservation(req, userAuth));
     }
@@ -135,9 +135,27 @@ class ReservationServiceImplTest {
         req.setEndTime(LocalDateTime.now().plusDays(1)); // end before start
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(resourceRepository.findById(100L)).thenReturn(Optional.of(resource));
+        when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
 
         assertThrows(BadRequestException.class, () -> reservationService.createReservation(req, userAuth));
+    }
+
+    @Test
+    @DisplayName("Create Reservation - Fails when Overlapping")
+    void createReservation_Overlapping_Conflict() {
+        ReservationCreateRequest req = new ReservationCreateRequest();
+        req.setResourceId(100L);
+        req.setStartTime(LocalDateTime.now().plusDays(1));
+        req.setEndTime(LocalDateTime.now().plusDays(2));
+        req.setPrice(BigDecimal.valueOf(100));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
+        when(reservationRepository.existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
+                any(Long.class), any(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> reservationService.createReservation(req, userAuth));
     }
 
     @Test
@@ -185,6 +203,22 @@ class ReservationServiceImplTest {
         assertNotNull(res);
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(BigDecimal.valueOf(120), reservation.getPrice());
+    }
+
+    @Test
+    @DisplayName("Update Reservation - USER invalid status transition")
+    void updateReservation_UserInvalidStatusTransition_Forbidden() {
+        ReservationCreateRequest req = new ReservationCreateRequest();
+        req.setResourceId(100L);
+        req.setStartTime(LocalDateTime.now().plusDays(3));
+        req.setEndTime(LocalDateTime.now().plusDays(4));
+        req.setPrice(BigDecimal.valueOf(120));
+
+        reservation.setStatus(ReservationStatus.CONFIRMED);
+        when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
+
+        assertThrows(ForbiddenException.class,
+                () -> reservationService.updateReservation(10L, req, ReservationStatus.PENDING, userAuth));
     }
 
     @Test

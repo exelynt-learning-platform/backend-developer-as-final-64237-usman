@@ -1,23 +1,23 @@
 package com.usman.resourcebooking.service.impl;
 
-import com.usman.resourcebooking.dto.request.LoginRequest;
-import com.usman.resourcebooking.dto.request.RegisterRequest;
-import com.usman.resourcebooking.dto.response.AuthResponse;
-import com.usman.resourcebooking.exception.ConflictException;
-import com.usman.resourcebooking.model.Role;
-import com.usman.resourcebooking.model.User;
-import com.usman.resourcebooking.repository.UserRepository;
-import com.usman.resourcebooking.security.JwtTokenProvider;
-import com.usman.resourcebooking.security.UserPrincipal;
-import com.usman.resourcebooking.service.AuthService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import com.usman.resourcebooking.dto.request.LoginRequest;
+import com.usman.resourcebooking.dto.request.RegisterRequest;
+import com.usman.resourcebooking.dto.response.AuthResponse;
+import com.usman.resourcebooking.model.Role;
+import com.usman.resourcebooking.model.User;
+import com.usman.resourcebooking.repository.UserRepository;
+import com.usman.resourcebooking.security.JwtTokenProvider;
+import com.usman.resourcebooking.security.UserPrincipal;
+import com.usman.resourcebooking.service.AuthService;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -29,15 +29,10 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
 
     @Override
-    @Transactional
     public String register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new ConflictException(
-                    "Username '" + request.getUsername() + "' is already taken");
-        }
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException(
-                    "Email '" + request.getEmail() + "' is already registered");
+        if (userRepository.existsByUsername(request.getUsername())
+                || userRepository.existsByEmail(request.getEmail())) {
+            return "Registration successful. You can now log in.";
         }
 
         User user = User.builder()

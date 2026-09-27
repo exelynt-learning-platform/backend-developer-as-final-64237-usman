@@ -41,8 +41,8 @@ The application uses a single `application.yml` file configured for PostgreSQL. 
 
 * `DATABASE_URL`: `jdbc:postgresql://postgres:5432/resource_booking`
 * `DATABASE_USER`: `rb_admin`
-* `DATABASE_PASSWORD`: `RbAdminPassword2026`
-* `JWT_SECRET`: Base64 encoded secret key for signing JWT tokens.
+* `DATABASE_PASSWORD`: `<YOUR_SECURE_PASSWORD>`
+* `JWT_SECRET`: `<GENERATE_BASE64_256BIT_SECRET>` (Base64 encoded secret key for signing JWT tokens. Fails fast if missing in production).
 * `JWT_EXPIRATION_MS`: Token validity duration in milliseconds (default: 86400000).
 
 ## Seed Users for Testing

@@ -1,15 +1,16 @@
 package com.usman.resourcebooking.util;
 
-import com.usman.resourcebooking.model.Role;
-import com.usman.resourcebooking.model.User;
-import com.usman.resourcebooking.repository.UserRepository;
-import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import com.usman.resourcebooking.model.Role;
+import com.usman.resourcebooking.model.User;
+import com.usman.resourcebooking.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
@@ -22,27 +23,26 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.count() > 0) {
-            log.info("Seed users already exist, skipping.");
-            return;
+        if (!userRepository.existsByUsername("admin")) {
+            User admin = User.builder()
+                    .username("admin")
+                    .email("admin@example.com")
+                    .password(passwordEncoder.encode("admin123"))
+                    .role(Role.ADMIN)
+                    .build();
+            userRepository.save(admin);
+            log.info("Seeded default account: admin/admin123 (ADMIN)");
         }
 
-        User admin = User.builder()
-                .username("admin")
-                .email("admin@example.com")
-                .password(passwordEncoder.encode("admin123"))
-                .role(Role.ADMIN)
-                .build();
-
-        User regularUser = User.builder()
-                .username("user1")
-                .email("user1@example.com")
-                .password(passwordEncoder.encode("user123"))
-                .role(Role.USER)
-                .build();
-
-        userRepository.saveAll(List.of(admin, regularUser));
-
-        log.info("Seeded default accounts: admin/admin123 (ADMIN), user1/user123 (USER)");
+        if (!userRepository.existsByUsername("user1")) {
+            User regularUser = User.builder()
+                    .username("user1")
+                    .email("user1@example.com")
+                    .password(passwordEncoder.encode("user123"))
+                    .role(Role.USER)
+                    .build();
+            userRepository.save(regularUser);
+            log.info("Seeded default account: user1/user123 (USER)");
+        }
     }
 }
