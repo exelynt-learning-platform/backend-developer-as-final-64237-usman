@@ -30,12 +30,6 @@ The application is fully containerized. The easiest way to run the backend and t
     ```
 4. The REST API will be accessible at: `http://localhost:8080`
 
-## Design Decisions & Architectural Assumptions
-
-**1. Resource Pricing vs. Reservation Pricing:**
-In a real-world SaaS booking system, a `Resource` (e.g., Room, Vehicle, Equipment) would typically possess a `basePrice` or `hourlyRate` attribute. However, to strictly align with the provided assignment requirements and Evaluation Criteria (specifically Criteria 6 & 7, which mandate storing and filtering prices exclusively at the `Reservation` level), the `Resource` entity was intentionally designed without a price field. 
-
-The final booking cost is tracked and persistently stored within the `Reservation` entity. This ensures 100% compliance with the assessment rubric and avoids over-engineering the database schema. In a production environment, this would be expanded by implementing a dynamic pricing engine computing `Resource.baseRate * bookingDuration`.
 
 ## API Documentation
 The API is documented and testable via two methods:
@@ -63,3 +57,23 @@ The application automatically provisions the following seed users on startup to 
 * **Username:** `user1`
 * **Password:** `user123`
 * **Access:** Read-only access to resources. Can only create, view, update, and cancel their own reservations.
+
+## Design Decisions & Future Enhancements
+
+**1. Resource Pricing vs. Reservation Pricing (Assignment Compliance):**
+In a real-world SaaS booking system, a `Resource` (e.g., Room, Vehicle, Equipment) would typically possess a `basePrice` or `hourlyRate` attribute. However, to strictly align with the provided assignment requirements and Evaluation Criteria (specifically Criteria 6 & 7, which mandate storing and filtering prices exclusively at the `Reservation` level), the `Resource` entity was intentionally designed without a price field. The final booking cost is tracked and persistently stored within the `Reservation` entity. In a production environment, this would be expanded by implementing a dynamic pricing engine computing `Resource.baseRate * bookingDuration`.
+
+**2. Concurrency Control (Future Enhancement):**
+Currently, double-booking prevention relies on strict database queries validating overlapping time slots before saving a reservation. For a high-traffic production system, we would introduce **Pessimistic Write Locks** at the database level or distributed locking mechanisms (e.g., Redis) to guarantee 100% thread safety when two users attempt to book the same resource at the exact same millisecond.
+
+**3. Soft Deletes & Audit Trails (Future Enhancement):**
+The current application uses "Hard Deletes" for resources and reservations as per standard CRUD requirements. In an enterprise system involving financial transactions, records are rarely physically deleted. A future enhancement would involve implementing "Soft Deletes" (e.g., `isActive = false`) and using Hibernate Envers to maintain a comprehensive audit log of who changed a reservation's status and when.
+
+**4. Caching & Performance Optimization (Future Enhancement):**
+To handle high read-throughput (e.g., users frequently browsing available resources), a distributed caching layer like **Redis** could be integrated. Caching the results of `GET /resources` and implementing cache eviction policies upon resource updates would drastically reduce database I/O and improve overall API latency.
+
+**5. Rate Limiting & API Protection (Future Enhancement):**
+While the API is currently secured with stateless JWTs and BCrypt, a production-grade system would implement **Rate Limiting** (e.g., using Bucket4j). This is absolutely crucial for protecting sensitive endpoints like `/auth/login` from brute-force attacks and preventing denial-of-service (DoS) on resource-intensive queries.
+
+**6. Asynchronous Processing & Infrastructure (Future Enhancement):**
+For a fully scalable architecture, the application would typically be deployed behind a Reverse Proxy / Load Balancer like **Nginx**. Furthermore, time-sensitive business logic—such as automatically expiring unpaid `PENDING` reservations after 15 minutes, or sending email notifications—would be decoupled from the main HTTP request threads and handled via **Cron Jobs** or asynchronous message brokers (e.g., RabbitMQ, Kafka).
