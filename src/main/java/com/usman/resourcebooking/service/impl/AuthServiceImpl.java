@@ -30,9 +30,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String register(RegisterRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())
-                || userRepository.existsByEmail(request.getEmail())) {
-            return "Registration successful. You can now log in.";
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new com.usman.resourcebooking.exception.ConflictException("Username is already taken");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new com.usman.resourcebooking.exception.ConflictException("Email is already registered");
         }
 
         User user = User.builder()

@@ -1,5 +1,14 @@
 package com.usman.resourcebooking.service.impl;
 
+import java.math.BigDecimal;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.usman.resourcebooking.dto.request.ReservationCreateRequest;
 import com.usman.resourcebooking.dto.response.ReservationResponse;
 import com.usman.resourcebooking.exception.BadRequestException;
@@ -16,20 +25,15 @@ import com.usman.resourcebooking.repository.ResourceRepository;
 import com.usman.resourcebooking.repository.UserRepository;
 import com.usman.resourcebooking.security.UserPrincipal;
 import com.usman.resourcebooking.service.ReservationService;
-import java.math.BigDecimal;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.core.Authentication;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
 
-        private static final java.util.List<ReservationStatus> ACTIVE_STATUSES = java.util.List.of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
+        private static final java.util.List<ReservationStatus> ACTIVE_STATUSES = java.util.List
+                        .of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
 
         private final ReservationRepository reservationRepository;
         private final ResourceRepository resourceRepository;
@@ -57,12 +61,12 @@ public class ReservationServiceImpl implements ReservationService {
                         throw new BadRequestException("End time must be strictly after start time");
                 }
 
-                boolean isOverlapping = reservationRepository.existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
-                        request.getResourceId(),
-                        ACTIVE_STATUSES,
-                        request.getEndTime(),
-                        request.getStartTime()
-                );
+                boolean isOverlapping = reservationRepository
+                                .existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
+                                                request.getResourceId(),
+                                                ACTIVE_STATUSES,
+                                                request.getEndTime(),
+                                                request.getStartTime());
 
                 if (isOverlapping) {
                         throw new ConflictException("The resource is already booked during this time slot.");
@@ -102,6 +106,7 @@ public class ReservationServiceImpl implements ReservationService {
                 return reservationRepository.findAll(spec, pageable)
                                 .map(this::mapToResponse);
         }
+
         @Override
         @Transactional(readOnly = true)
         public ReservationResponse getReservationById(Long id, Authentication authentication) {
@@ -115,7 +120,8 @@ public class ReservationServiceImpl implements ReservationService {
 
         @Override
         @Transactional
-        public ReservationResponse updateReservation(Long id, ReservationCreateRequest request, ReservationStatus status, Authentication authentication) {
+        public ReservationResponse updateReservation(Long id, ReservationCreateRequest request,
+                        ReservationStatus status, Authentication authentication) {
                 Reservation reservation = reservationRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Reservation", "id", id));
 
@@ -123,9 +129,11 @@ public class ReservationServiceImpl implements ReservationService {
 
                 if (!reservation.getResource().getId().equals(request.getResourceId())) {
                         Resource resource = resourceRepository.findByIdWithPessimisticWriteLock(request.getResourceId())
-                                        .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", request.getResourceId()));
+                                        .orElseThrow(() -> new ResourceNotFoundException("Resource", "id",
+                                                        request.getResourceId()));
                         if (!resource.isAvailable()) {
-                                throw new ConflictException("Resource '" + resource.getName() + "' is not currently available for booking");
+                                throw new ConflictException("Resource '" + resource.getName()
+                                                + "' is not currently available for booking");
                         }
                         reservation.setResource(resource);
                 }
@@ -134,13 +142,13 @@ public class ReservationServiceImpl implements ReservationService {
                         throw new BadRequestException("End time must be strictly after start time");
                 }
 
-                boolean isOverlapping = reservationRepository.existsByResourceIdAndIdNotAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
-                        request.getResourceId(),
-                        id,
-                        ACTIVE_STATUSES,
-                        request.getEndTime(),
-                        request.getStartTime()
-                );
+                boolean isOverlapping = reservationRepository
+                                .existsByResourceIdAndIdNotAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
+                                                request.getResourceId(),
+                                                id,
+                                                ACTIVE_STATUSES,
+                                                request.getEndTime(),
+                                                request.getStartTime());
 
                 if (isOverlapping) {
                         throw new ConflictException("The resource is already booked during this time slot.");
@@ -149,14 +157,16 @@ public class ReservationServiceImpl implements ReservationService {
                 reservation.setStartTime(request.getStartTime());
                 reservation.setEndTime(request.getEndTime());
                 reservation.setPrice(request.getPrice());
-                
+
                 if (status != null && status != reservation.getStatus()) {
                         boolean isAdmin = authentication.getAuthorities().stream()
                                         .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-                        
+
                         if (!isAdmin) {
-                                if (reservation.getStatus() != ReservationStatus.PENDING || status != ReservationStatus.CANCELLED) {
-                                        throw new ForbiddenException("Users can only cancel pending reservations. Other status transitions require admin privileges.");
+                                if (reservation.getStatus() != ReservationStatus.PENDING
+                                                || status != ReservationStatus.CANCELLED) {
+                                        throw new ForbiddenException(
+                                                        "Users can only cancel pending reservations. Other status transitions require admin privileges.");
                                 }
                         }
                         reservation.setStatus(status);

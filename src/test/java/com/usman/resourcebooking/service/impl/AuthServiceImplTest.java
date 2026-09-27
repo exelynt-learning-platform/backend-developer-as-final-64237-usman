@@ -1,6 +1,7 @@
 package com.usman.resourcebooking.service.impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -20,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.usman.resourcebooking.dto.request.LoginRequest;
 import com.usman.resourcebooking.dto.request.RegisterRequest;
 import com.usman.resourcebooking.dto.response.AuthResponse;
+import com.usman.resourcebooking.exception.ConflictException;
 import com.usman.resourcebooking.model.Role;
 import com.usman.resourcebooking.model.User;
 import com.usman.resourcebooking.repository.UserRepository;
@@ -68,8 +70,7 @@ class AuthServiceImplTest {
 
         when(userRepository.existsByUsername("takenuser")).thenReturn(true);
 
-        String response = authService.register(req);
-        assertEquals("Registration successful. You can now log in.", response);
+        assertThrows(ConflictException.class, () -> authService.register(req));
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -83,8 +84,7 @@ class AuthServiceImplTest {
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
         when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
 
-        String response = authService.register(req);
-        assertEquals("Registration successful. You can now log in.", response);
+        assertThrows(ConflictException.class, () -> authService.register(req));
         verify(userRepository, never()).save(any(User.class));
     }
 
