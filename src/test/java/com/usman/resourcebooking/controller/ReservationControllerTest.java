@@ -255,14 +255,31 @@ class ReservationControllerTest {
         @Test
         @DisplayName("200 OK — USER can update their reservation")
         void update_Returns200() throws Exception {
-            given(reservationService.updateReservation(eq(1L), any(), any(), any()))
+            given(reservationService.updateReservation(eq(1L), any(), any()))
                     .willReturn(sampleResponse());
 
             mockMvc.perform(put("/reservations/1")
                     .with(authentication(userAuth()))
-                    .param("status", "CANCELLED")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(validRequest())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.id").value(1));
+        }
+    }
+
+    @Nested
+    @DisplayName("PATCH /reservations/{id}/status")
+    class UpdateReservationStatusTests {
+
+        @Test
+        @DisplayName("200 OK — USER can update their reservation status")
+        void updateStatus_Returns200() throws Exception {
+            given(reservationService.updateReservationStatus(eq(1L), any(), any()))
+                    .willReturn(sampleResponse());
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/reservations/1/status")
+                    .with(authentication(userAuth()))
+                    .param("status", "CANCELLED"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.id").value(1));
         }

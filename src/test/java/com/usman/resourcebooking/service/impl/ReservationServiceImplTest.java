@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -119,6 +120,8 @@ class ReservationServiceImplTest {
         resource.setAvailable(false);
         ReservationCreateRequest req = new ReservationCreateRequest();
         req.setResourceId(100L);
+        req.setStartTime(LocalDateTime.now().plusDays(1));
+        req.setEndTime(LocalDateTime.now().plusDays(2));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
@@ -133,9 +136,6 @@ class ReservationServiceImplTest {
         req.setResourceId(100L);
         req.setStartTime(LocalDateTime.now().plusDays(2));
         req.setEndTime(LocalDateTime.now().plusDays(1)); // end before start
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(resourceRepository.findByIdWithPessimisticWriteLock(100L)).thenReturn(Optional.of(resource));
 
         assertThrows(BadRequestException.class, () -> reservationService.createReservation(req, userAuth));
     }
@@ -199,26 +199,23 @@ class ReservationServiceImplTest {
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
         when(reservationRepository.save(any(Reservation.class))).thenReturn(reservation);
 
-        ReservationResponse res = reservationService.updateReservation(10L, req, ReservationStatus.CANCELLED, userAuth);
+        ReservationResponse res = reservationService.updateReservation(10L, req, userAuth);
         assertNotNull(res);
-        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(BigDecimal.valueOf(120), reservation.getPrice());
+        
+        ReservationResponse statusRes = reservationService.updateReservationStatus(10L, ReservationStatus.CANCELLED, userAuth);
+        assertNotNull(statusRes);
+        assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
     }
 
     @Test
     @DisplayName("Update Reservation - USER invalid status transition")
     void updateReservation_UserInvalidStatusTransition_Forbidden() {
-        ReservationCreateRequest req = new ReservationCreateRequest();
-        req.setResourceId(100L);
-        req.setStartTime(LocalDateTime.now().plusDays(3));
-        req.setEndTime(LocalDateTime.now().plusDays(4));
-        req.setPrice(BigDecimal.valueOf(120));
-
         reservation.setStatus(ReservationStatus.CONFIRMED);
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
 
         assertThrows(ForbiddenException.class,
-                () -> reservationService.updateReservation(10L, req, ReservationStatus.PENDING, userAuth));
+                () -> reservationService.updateReservationStatus(10L, ReservationStatus.PENDING, userAuth));
     }
 
     @Test
@@ -233,7 +230,7 @@ class ReservationServiceImplTest {
         req.setResourceId(100L);
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservation));
-        assertThrows(ForbiddenException.class, () -> reservationService.updateReservation(10L, req, null, otherAuth));
+        assertThrows(ForbiddenException.class, () -> reservationService.updateReservation(10L, req, otherAuth));
     }
 
     @Test
@@ -261,9 +258,11 @@ class ReservationServiceImplTest {
     @DisplayName("Get Reservations - ADMIN sees all (specs test proxy)")
     void getReservations_Admin_GetsAll() {
         Page<Reservation> page = new PageImpl<>(List.of(reservation));
-        when(reservationRepository.findAll(any(Specification.class), any(PageRequest.class))).thenReturn(page);
+        when(reservationRepository.findAll(any(Specification.class),
+                any(Pageable.class))).thenReturn(page);
 
-        Page<ReservationResponse> res = reservationService.getReservations(null, null, null, PageRequest.of(0, 10),
+        Pageable mockPageable = org.mockito.Mockito.mock(Pageable.class);
+        Page<ReservationResponse> res = reservationService.getReservations(null, null, null, mockPageable,
                 adminAuth);
         assertEquals(1, res.getTotalElements());
     }

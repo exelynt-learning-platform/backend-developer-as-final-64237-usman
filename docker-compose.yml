@@ -25,11 +25,13 @@ services:
       - "8080:8080"
     environment:
       # These overwrite the fallbacks in your application.yml
+      SPRING_PROFILES_ACTIVE: dev
       DATABASE_URL: jdbc:postgresql://postgres:5432/resource_booking
       DATABASE_USER: rb_admin
       DATABASE_PASSWORD: RbAdminPassword2026
       # Set a strong JWT secret for the Docker environment
       JWT_SECRET: bXlTdXBlclNlY3VyZUpXVFNlY3JldEtleUZvclJlc291cmNlQm9va2luZ1N5c3RlbQ==
+      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy

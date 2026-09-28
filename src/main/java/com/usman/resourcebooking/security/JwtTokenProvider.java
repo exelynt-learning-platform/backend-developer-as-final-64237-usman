@@ -18,6 +18,7 @@ import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
+import jakarta.annotation.PostConstruct;
 
 @Component
 public class JwtTokenProvider {
@@ -32,6 +33,17 @@ public class JwtTokenProvider {
 
     @Value("${jwt.expiration-ms:${jwt.expirationMs:86400000}}")
     private long jwtExpirationMs;
+
+    @PostConstruct
+    public void validateSecret() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalArgumentException("JWT secret cannot be null or blank");
+        }
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes (256 bits) for HS256");
+        }
+    }
 
     private SecretKey signingKey() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -55,26 +67,17 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String getUsernameFromJWT(String token) {
-        return parseClaims(token).getSubject();
-    }
-
-    public Long getUserIdFromJWT(String token) {
-        return parseClaims(token).get(CLAIM_USER_ID, Long.class);
-    }
-
-    private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-
+    /**
+     * Extracts the userId claim from already-parsed JWT claims.
+     */
     public Long getUserIdFromClaims(Claims claims) {
         return claims.get(CLAIM_USER_ID, Long.class);
     }
 
+    /**
+     * Parses and validates a JWT token, returning Claims on success or null on
+     * failure.
+     */
     public Claims parseAndValidateClaims(String authToken) {
         try {
             return Jwts.parser()

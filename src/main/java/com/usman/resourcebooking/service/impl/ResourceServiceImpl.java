@@ -61,10 +61,9 @@ public class ResourceServiceImpl implements ResourceService {
     @Override
     @Transactional
     public void deleteResource(Long id) {
-        if (!resourceRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Resource", "id", id);
-        }
-        resourceRepository.deleteById(id);
+        Resource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", id));
+        resourceRepository.delete(resource);
     }
 
     private Resource findOrThrow(Long id) {

@@ -23,7 +23,9 @@ public interface ReservationService {
 
     ReservationResponse getReservationById(Long id, Authentication authentication);
 
-    ReservationResponse updateReservation(Long id, ReservationCreateRequest request, ReservationStatus status, Authentication authentication);
+    ReservationResponse updateReservation(Long id, ReservationCreateRequest request, Authentication authentication);
+
+    ReservationResponse updateReservationStatus(Long id, ReservationStatus status, Authentication authentication);
 
     void deleteReservation(Long id, Authentication authentication);
 }

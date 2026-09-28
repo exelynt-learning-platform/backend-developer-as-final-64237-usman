@@ -121,19 +121,19 @@ class ResourceServiceImplTest {
     @Test
     @DisplayName("Delete resource - found")
     void deleteResource_Found() {
-        when(resourceRepository.existsById(1L)).thenReturn(true);
+        when(resourceRepository.findById(1L)).thenReturn(Optional.of(resource));
 
         resourceService.deleteResource(1L);
 
-        verify(resourceRepository, times(1)).deleteById(1L);
+        verify(resourceRepository, times(1)).delete(resource);
     }
 
     @Test
     @DisplayName("Delete resource - not found")
     void deleteResource_NotFound() {
-        when(resourceRepository.existsById(1L)).thenReturn(false);
+        when(resourceRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> resourceService.deleteResource(1L));
-        verify(resourceRepository, never()).deleteById(anyLong());
+        verify(resourceRepository, never()).delete(any());
     }
 }

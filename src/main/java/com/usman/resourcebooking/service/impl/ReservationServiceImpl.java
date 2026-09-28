@@ -1,6 +1,7 @@
 package com.usman.resourcebooking.service.impl;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ import com.usman.resourcebooking.repository.ReservationRepository;
 import com.usman.resourcebooking.repository.ReservationSpecification;
 import com.usman.resourcebooking.repository.ResourceRepository;
 import com.usman.resourcebooking.repository.UserRepository;
+import com.usman.resourcebooking.security.SecurityUtils;
 import com.usman.resourcebooking.security.UserPrincipal;
 import com.usman.resourcebooking.service.ReservationService;
 
@@ -32,7 +34,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
 
-        private static final java.util.List<ReservationStatus> ACTIVE_STATUSES = java.util.List
+        private static final List<ReservationStatus> ACTIVE_STATUSES = List
                         .of(ReservationStatus.PENDING, ReservationStatus.CONFIRMED);
 
         private final ReservationRepository reservationRepository;
@@ -45,6 +47,8 @@ public class ReservationServiceImpl implements ReservationService {
                         Authentication authentication) {
                 UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
+                validateTimeOrdering(request);
+
                 User user = userRepository.findById(principal.getId())
                                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", principal.getId()));
 
@@ -52,14 +56,7 @@ public class ReservationServiceImpl implements ReservationService {
                                 .orElseThrow(() -> new ResourceNotFoundException("Resource", "id",
                                                 request.getResourceId()));
 
-                if (!resource.isAvailable()) {
-                        throw new ConflictException(
-                                        "Resource '" + resource.getName() + "' is not currently available for booking");
-                }
-
-                if (!request.getEndTime().isAfter(request.getStartTime())) {
-                        throw new BadRequestException("End time must be strictly after start time");
-                }
+                validateResourceAvailability(resource);
 
                 boolean isOverlapping = reservationRepository
                                 .existsByResourceIdAndStatusInAndStartTimeLessThanAndEndTimeGreaterThan(
@@ -93,14 +90,11 @@ public class ReservationServiceImpl implements ReservationService {
                         Authentication authentication) {
                 UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
-                boolean isAdmin = authentication.getAuthorities().stream()
-                                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-
                 Specification<Reservation> spec = ReservationSpecification.hasStatus(status)
                                 .and(ReservationSpecification.minPrice(minPrice))
                                 .and(ReservationSpecification.maxPrice(maxPrice));
 
-                if (!isAdmin) {
+                if (!SecurityUtils.isAdmin(authentication)) {
                         spec = spec.and(ReservationSpecification.belongsToUser(principal.getId()));
                 }
                 return reservationRepository.findAll(spec, pageable)
@@ -113,7 +107,7 @@ public class ReservationServiceImpl implements ReservationService {
                 Reservation reservation = reservationRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Reservation", "id", id));
 
-                checkOwnership(reservation, authentication);
+                SecurityUtils.checkOwnership(reservation, authentication);
 
                 return mapToResponse(reservation);
         }
@@ -121,25 +115,20 @@ public class ReservationServiceImpl implements ReservationService {
         @Override
         @Transactional
         public ReservationResponse updateReservation(Long id, ReservationCreateRequest request,
-                        ReservationStatus status, Authentication authentication) {
+                        Authentication authentication) {
                 Reservation reservation = reservationRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Reservation", "id", id));
 
-                checkOwnership(reservation, authentication);
+                SecurityUtils.checkOwnership(reservation, authentication);
+
+                validateTimeOrdering(request);
 
                 if (!reservation.getResource().getId().equals(request.getResourceId())) {
                         Resource resource = resourceRepository.findByIdWithPessimisticWriteLock(request.getResourceId())
                                         .orElseThrow(() -> new ResourceNotFoundException("Resource", "id",
                                                         request.getResourceId()));
-                        if (!resource.isAvailable()) {
-                                throw new ConflictException("Resource '" + resource.getName()
-                                                + "' is not currently available for booking");
-                        }
+                        validateResourceAvailability(resource);
                         reservation.setResource(resource);
-                }
-
-                if (!request.getEndTime().isAfter(request.getStartTime())) {
-                        throw new BadRequestException("End time must be strictly after start time");
                 }
 
                 boolean isOverlapping = reservationRepository
@@ -158,11 +147,19 @@ public class ReservationServiceImpl implements ReservationService {
                 reservation.setEndTime(request.getEndTime());
                 reservation.setPrice(request.getPrice());
 
-                if (status != null && status != reservation.getStatus()) {
-                        boolean isAdmin = authentication.getAuthorities().stream()
-                                        .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                return mapToResponse(reservationRepository.save(reservation));
+        }
 
-                        if (!isAdmin) {
+        @Override
+        @Transactional
+        public ReservationResponse updateReservationStatus(Long id, ReservationStatus status, Authentication authentication) {
+                Reservation reservation = reservationRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Reservation", "id", id));
+
+                SecurityUtils.checkOwnership(reservation, authentication);
+
+                if (status != null && status != reservation.getStatus()) {
+                        if (!SecurityUtils.isAdmin(authentication)) {
                                 if (reservation.getStatus() != ReservationStatus.PENDING
                                                 || status != ReservationStatus.CANCELLED) {
                                         throw new ForbiddenException(
@@ -181,18 +178,21 @@ public class ReservationServiceImpl implements ReservationService {
                 Reservation reservation = reservationRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Reservation", "id", id));
 
-                checkOwnership(reservation, authentication);
+                SecurityUtils.checkOwnership(reservation, authentication);
 
                 reservationRepository.delete(reservation);
         }
 
-        private void checkOwnership(Reservation reservation, Authentication authentication) {
-                UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-                boolean isAdmin = authentication.getAuthorities().stream()
-                                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        private void validateTimeOrdering(ReservationCreateRequest request) {
+                if (!request.getEndTime().isAfter(request.getStartTime())) {
+                        throw new BadRequestException("End time must be strictly after start time");
+                }
+        }
 
-                if (!isAdmin && !reservation.getUser().getId().equals(principal.getId())) {
-                        throw new ForbiddenException("You do not have permission to access this reservation");
+        private void validateResourceAvailability(Resource resource) {
+                if (!resource.isAvailable()) {
+                        throw new ConflictException("Resource '" + resource.getName()
+                                        + "' is not currently available for booking");
                 }
         }
 

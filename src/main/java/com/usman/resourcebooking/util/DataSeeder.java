@@ -3,6 +3,7 @@ package com.usman.resourcebooking.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 
 @Component
 @RequiredArgsConstructor
+@Profile("dev")
 public class DataSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
@@ -31,7 +33,7 @@ public class DataSeeder implements CommandLineRunner {
                     .role(Role.ADMIN)
                     .build();
             userRepository.save(admin);
-            log.info("Seeded default account: admin/admin123 (ADMIN)");
+            log.info("Seeded default ADMIN account: admin");
         }
 
         if (!userRepository.existsByUsername("user1")) {
@@ -42,7 +44,7 @@ public class DataSeeder implements CommandLineRunner {
                     .role(Role.USER)
                     .build();
             userRepository.save(regularUser);
-            log.info("Seeded default account: user1/user123 (USER)");
+            log.info("Seeded default USER account: user1");
         }
     }
 }

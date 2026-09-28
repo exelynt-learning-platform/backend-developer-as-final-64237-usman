@@ -1,0 +1,19 @@
+# Test configuration — self-contained with H2 in-memory database
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=false;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+    open-in-view: false
+
+jwt:
+  secret: bXlTdXBlclNlY3VyZUpXVFNlY3JldEtleUZvclJlc291cmNlQm9va2luZ1N5c3RlbQ==
+  expiration-ms: 86400000
